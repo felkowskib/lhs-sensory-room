@@ -1,0 +1,11 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Update Taken Dates</title>
+<style>body{font:16px system-ui;max-width:650px;margin:30px auto;padding:0 20px;line-height:1.5}h1{color:#a82f48}.grid{display:grid;grid-template-columns:repeat(7,1fr);gap:8px}label{padding:10px 3px;border:1px solid #ccc;border-radius:6px;text-align:center}button{background:#a82f48;color:white;border:0;padding:14px;border-radius:8px;font-weight:bold;margin:20px 0;cursor:pointer}small{color:#666}</style></head><body>
+<h1>Mark donation dates TAKEN</h1><p>Check dates after confirming their PayPal donations. Then download a replacement calendar page.</p>
+<div class="grid" id="grid"></div><button id="save">Download updated index.html</button>
+<p><strong>Important:</strong> This editor does not change the live site automatically. Replace the existing <code>index.html</code> in your website folder with the downloaded file, then republish the folder to your host. Your changes become visible to everyone only after republishing.</p>
+<small>Keep this editor for yourself; donors only need the main calendar link.</small>
+<script>
+const g=document.getElementById('grid');for(let n=1;n<=31;n++){let l=document.createElement('label');l.innerHTML='<input type="checkbox" value="'+n+'"> '+n;g.append(l)}
+fetch('index.html').then(r=>r.text()).then(t=>{let m=t.match(/const TAKEN_DATES = (\[[^\]]*\]);/);if(m){let taken=JSON.parse(m[1]);document.querySelectorAll('input').forEach(x=>x.checked=taken.includes(+x.value))}}).catch(()=>{});
+document.getElementById('save').onclick=async()=>{let response=await fetch('index.html');let t=await response.text();let selected=[...document.querySelectorAll('input:checked')].map(x=>+x.value);t=t.replace(/const TAKEN_DATES = \[[^\]]*\];/,'const TAKEN_DATES = '+JSON.stringify(selected)+';');let a=document.createElement('a');a.href=URL.createObjectURL(new Blob([t],{type:'text/html'}));a.download='index.html';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),5000)}
+</script></body></html>
