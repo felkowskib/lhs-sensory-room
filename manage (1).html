@@ -1,0 +1,76 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>LHS Calendar — Organizer</title><style>
+body{font:16px system-ui;max-width:650px;margin:25px auto;padding:0 16px;background:#fff6f4;color:#292323}
+h1{color:#a82f48}.panel{background:white;border-radius:12px;padding:20px;margin:14px 0}
+input[type=email],input[type=password]{display:block;width:100%;padding:12px;margin:9px 0;box-sizing:border-box}
+button{background:#a82f48;color:white;border:0;border-radius:7px;padding:12px 17px;font-weight:bold;cursor:pointer}
+button:disabled{opacity:.5}.grid{display:grid;grid-template-columns:repeat(7,1fr);gap:8px}
+label{border:1px solid #ddd;padding:10px 0;text-align:center;border-radius:8px;cursor:pointer}
+label:has(input:checked){background:#ffe1e4;border-color:#a82f48}
+#message{min-height:24px}small{color:#666}
+</style></head><body><h1>🎄 LHS Date Manager</h1>
+<p>Confirm a donation in PayPal, then mark its date TAKEN here.</p>
+<section class="panel" id="loginPanel"><h2>Organizer sign in</h2>
+<input id="email" type="email" placeholder="Supabase user email" autocomplete="username">
+<input id="password" type="password" placeholder="Supabase user password" autocomplete="current-password">
+<button id="login">Sign in</button></section>
+<section class="panel" id="editor" hidden><h2>Mark dates TAKEN</h2><div class="grid" id="grid"></div>
+<p><button id="save">Save TAKEN dates</button> <button id="logout" style="background:#777">Sign out</button></p>
+<small>Changes appear on the public calendar after visitors refresh. Only mark dates once PayPal confirms payment.</small></section>
+<p id="message" role="status"></p>
+<script>
+const API='https://qzmsjtpgypvgyithdszn.supabase.co', KEY='sb_publishable_yslwKccgdZuPYi4SPsnIkA_i-EuzQE8';
+let token=null, refreshToken=null, current=[];
+const msg=document.getElementById('message');
+function note(s){msg.textContent=s}
+async function request(path,options={}){
+ const res=await fetch(API+path,{...options,headers:{apikey:KEY,...(token?{Authorization:'Bearer '+token}:{}),...(options.headers||{})}});
+ if(!res.ok){let details='';try{details=JSON.stringify(await res.json())}catch(e){}throw Error('Request failed ('+res.status+'). '+details)}
+ const body=await res.text(); return body.trim()?JSON.parse(body):null;
+}
+function showEditor(){
+ document.getElementById('loginPanel').hidden=true;
+ document.getElementById('editor').hidden=false;
+}
+async function load(){
+ const rows=await fetch(API+'/rest/v1/taken_dates?select=date_number,taken',{headers:{apikey:KEY},cache:'no-store'});
+ if(!rows.ok)throw Error('Could not load dates');
+ current=(await rows.json()).filter(x=>x.taken).map(x=>x.date_number);
+ document.querySelectorAll('.grid input').forEach(x=>x.checked=current.includes(+x.value));
+}
+for(let i=1;i<=31;i++){
+ const l=document.createElement('label');l.innerHTML='<input type="checkbox" value="'+i+'"> '+i;
+ document.getElementById('grid').append(l);
+}
+document.getElementById('login').onclick=async()=>{
+ try{
+  note('Signing in…');
+  const data=await request('/auth/v1/token?grant_type=password',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:document.getElementById('email').value.trim(),password:document.getElementById('password').value})});
+  token=data.access_token;refreshToken=data.refresh_token;
+  sessionStorage.setItem('lhs_session',JSON.stringify({token,refreshToken}));
+  document.getElementById('password').value='';
+  showEditor();await load();note('Signed in. Check dates and press Save.');
+ }catch(e){note('Sign-in error: '+e.message)}
+};
+async function renew(){
+ if(!refreshToken)throw Error('Please sign in again');
+ const data=await request('/auth/v1/token?grant_type=refresh_token',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({refresh_token:refreshToken})});
+ token=data.access_token;refreshToken=data.refresh_token;
+ sessionStorage.setItem('lhs_session',JSON.stringify({token,refreshToken}));
+}
+document.getElementById('save').onclick=async()=>{
+ const btn=document.getElementById('save');btn.disabled=true;
+ try{
+  note('Saving…');await renew();
+  const desired=[...document.querySelectorAll('.grid input:checked')].map(x=>+x.value);
+  const additions=desired.filter(n=>!current.includes(n));
+  const removals=current.filter(n=>!desired.includes(n));
+  for(const n of additions)await request('/rest/v1/taken_dates',{method:'POST',headers:{'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify({date_number:n,taken:true})});
+  for(const n of removals)await request('/rest/v1/taken_dates?date_number=eq.'+n,{method:'DELETE',headers:{'Prefer':'return=minimal'}});
+  await load();note('Saved! Your public calendar will show the TAKEN dates when refreshed.');
+ }catch(e){note('Could not save: '+e.message+'. Check your organizer permissions in Supabase.');try{await load()}catch(_){}}
+ finally{btn.disabled=false}
+};
+document.getElementById('logout').onclick=()=>{sessionStorage.removeItem('lhs_session');location.reload()};
+try{const saved=JSON.parse(sessionStorage.getItem('lhs_session')||'null');if(saved){token=saved.token;refreshToken=saved.refreshToken;showEditor();load().catch(e=>note(e.message));}}catch(e){}
+</script></body></html>
