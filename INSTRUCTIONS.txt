@@ -1,0 +1,8 @@
+Upload index.html and manage.html to the ROOT of your existing GitHub repository, replacing old files. DO NOT replace calendar.jpg.
+Open https://felkowskib.github.io/lhs-sensory-room/manage.html and sign in with the email and password created in Supabase Authentication > Users.
+Select dates, click Save, and refresh the public calendar. Your TinyURL remains the same.
+
+IMPORTANT: For a date already paid (e.g. December 1), check it and Save.
+
+The public page refuses to display donation buttons if the database cannot be reached, to avoid double bookings.
+The Supabase RLS policies must permit authenticated INSERT and DELETE only for your exact user UID.

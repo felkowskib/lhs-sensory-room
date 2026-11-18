@@ -26,21 +26,38 @@ h1{font-size:1.1rem;text-align:center;color:#a82f48;margin:8px 0}
 <p class="intro">Tap an available date to donate that amount through PayPal.</p>
 <div class="calendar" aria-label="Christmas Pick a Date to Donate calendar">
 <img src="calendar.jpg" alt="December pick a date to donate Christmas fundraiser calendar" width="1582" height="2048">
-<div class="dates" id="dates"></div></div>
+<div class="dates" id="dates"></div></div><p id="status" role="status" style="text-align:center;color:#a82f48;font-weight:600">Checking available dates…</p>
 <div class="note"><strong>How it works:</strong> Choose a number (December 11 = $11), then complete your donation on PayPal. For a different amount, tap any “Any amount” square. Dates marked TAKEN are unavailable. Thank you for supporting the LHS Sensory Room!</div>
 <p class="footer">PayPal handles the payment. This page does not collect payment information. A date is marked taken only after the organizer confirms and updates it.</p>
 </main><script>
-const TAKEN_DATES = [];
+const API='https://qzmsjtpgypvgyithdszn.supabase.co';
+const KEY='sb_publishable_yslwKccgdZuPYi4SPsnIkA_i-EuzQE8';
 const paypal='https://paypal.me/lhssensoryroom';
 const grid=document.getElementById('dates');
-for(let i=1;i<=35;i++){
- const a=document.createElement('a');
- const isAny=i>31, taken=!isAny&&TAKEN_DATES.includes(i);
- a.className='date'+(isAny?' any':'')+(taken?' taken':'');
- if(taken){a.setAttribute('aria-label','December '+i+' taken');a.innerHTML='<span>TAKEN</span>';}
- else{a.href=paypal+(isAny?'':'/'+i);a.target='_blank';a.rel='noopener noreferrer';
- a.setAttribute('aria-label',isAny?'Donate any amount via PayPal':'Donate $'+i+' via PayPal');
- a.innerHTML='<span>'+(isAny?'Donate':'$'+i)+'</span>';}
- grid.appendChild(a);
+function draw(taken){
+ grid.replaceChildren();
+ for(let i=1;i<=35;i++){
+  const a=document.createElement('a'), any=i>31, blocked=!any&&taken.includes(i);
+  a.className='date'+(any?' any':'')+(blocked?' taken':'');
+  if(blocked){a.setAttribute('aria-label','December '+i+' taken');a.innerHTML='<span>TAKEN</span>';a.removeAttribute('href');}
+  else{a.href=paypal+(any?'':'/'+i);a.target='_blank';a.rel='noopener noreferrer';
+    a.setAttribute('aria-label',any?'Donate any amount via PayPal':'Donate $'+i+' via PayPal');
+    a.innerHTML='<span>'+(any?'Donate':'$'+i)+'</span>';}
+  grid.appendChild(a);
+ }
 }
+async function loadDates(){
+ try{
+  const response=await fetch(API+'/rest/v1/taken_dates?select=date_number,taken',{headers:{apikey:KEY},cache:'no-store'});
+  if(!response.ok)throw Error('Database unavailable');
+  const rows=await response.json();
+  draw(rows.filter(r=>r.taken).map(r=>r.date_number));
+  document.getElementById('status').textContent='';
+ }catch(e){
+  document.getElementById('status').textContent='Unable to check TAKEN dates right now. Please refresh before donating.';
+  grid.replaceChildren(); // fail closed rather than offer dates that may already be taken
+ }
+}
+loadDates();
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)loadDates();});
 </script></body></html>
